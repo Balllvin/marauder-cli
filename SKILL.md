@@ -1,6 +1,6 @@
 ---
 name: marauder-cli
-description: Use when calling the Marauder CLI or Agent key.
+description: Use whenever a task calls the Marauder CLI (`python -m app.cli`) or the MCP server at /api/mcp, uses or mentions an Agent key, or wires an agent or VM to Marauder - login and whoami, notebooks and files, portfolios and pinned notebooks, revx-book and revx-account, order proposals and approvals, FMP catalog calls, plugin runs - or builds an MCP or ChatGPT app on Marauder tools. Triggers include /marauder-cli, /chatgpt-apps, "marauder" commands, "notebook list", "revx-book", "portfolio --source", "Agent key", "MCP tool".
 ---
 
 # Marauder CLI
@@ -149,6 +149,20 @@ Notebook verbs that need `--confirm`: `delete`, `folder delete`, `file replace`,
 `notebook local` is a granted Native root, not a second cloud store. `setup` places the public Mac zip. It does not mint Agent keys. Do not bypass a Gatekeeper failure.
 
 `settings get` never prints secrets. `--full` keeps sent-history and Smaug memory blobs. Do not paste those into chat.
+
+## Agent-friendly shape (gaps to close)
+
+Two patterns from OpenAI's `cli-creator` and Anthropic's `mcp-builder` skills (both Apache-2.0, rewritten here). Neither exists yet. Build them in their own PR, not inside an unrelated change.
+
+- **`doctor --json`.** One read-only command that reports base URL, `host_hint`, auth state, and the auth source category (`workspace_env`, `env`, `config`, `missing`), never the key itself, plus one probe call's result. `whoami` covers most of this today. Adding it means a new top-level command, so update the command block above and the audit test in the same PR.
+- **MCP tool annotations.** Every tool in `backend/app/agent_tools/defs/` should declare `readOnlyHint`, `destructiveHint`, and `idempotentHint`, emitted on `/api/mcp` `tools/list`. Reads are read-only and idempotent. File replace is destructive and idempotent. Append, proposals, and sends are neither. A client can then auto-approve reads and ask before destructive calls. Run `python -m app.agent_tools.generate` after editing defs.
+- **Errors say the next call.** Keep `hint` on every `ok: false` so an agent can recover without reading source.
+
+## MCP apps
+
+Building a ChatGPT Apps SDK app (MCP server plus widget UI) on top of Marauder tools: read [chatgpt-apps](references/chatgpt-apps/index.md). It is docs-first because the Apps SDK bridge changes often. Tools still come from `backend/app/agent_tools/defs/`, never a parallel catalog.
+
+Index: [chatgpt-apps](references/chatgpt-apps/index.md) is the only reference in this skill.
 
 ## Audit
 
