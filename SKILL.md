@@ -110,15 +110,19 @@ python -m app.cli plugin run fmp_mcp.quote --args '{"endpoint":"quote","symbol":
 Run `<command> --help` before you invent a flag. Top-level names:
 
 ```
-login logout whoami mcp-url settings
-company fmp etf etf-flows sentiment compare memo research jev
+login logout whoami mcp-url account settings connection support trading
+company market fmp etf etf-flows sentiment compare memo research decision
 portfolio watchlist ibkr ibkr-book revx-book revx-account revx-fill-wake revx-funding-liqs
 notebook
 smaug chat bots notifications search events
 plugin tool
 ```
 
+Prove a CLI change against the live command help or a test, not a remembered flag. Before a contract change, name the blast radius. [Blast radius](../build/references/blast-radius.md). [Prove it works](../build/references/principle-prove-it-works.md).
+
 Market reads: `company TICKER`, `fmp quote|earnings|earnings-calendar|economics-calendar|economics-high-impact|crypto-quote`. Calendars need `--from` and `--to`. Earnings calendar `time` is `bmo`, `amc`, or `tba`.
+
+Session status: `market status [SYMBOL ...]` returns one row per market with `state`, `session_date`, `next_open_at`, `closes_at`, and a `line` in the user's time zone. No symbols means the US market. Ask it before saying a move happened "today".
 
 Portfolio reads: `portfolio` (slim current state), `portfolio list|holdings|performance|exposure|pnl|activity|dump`. `--source` is `manual`, `ibkr`, or `revx`. Writes `create|rename|archive|restore|delete|import` need `--confirm`.
 
@@ -132,13 +136,30 @@ Portfolio reads: `portfolio` (slim current state), `portfolio list|holdings|perf
 
 `research ask --ticker NVDA` reuses the latest completed run or starts one. A follow-up is `--run-id` plus `--question`.
 
-`jev portfolio` needs `--confirm` when it judges. `jev rank|history|verdict|replay` are reads. No orders.
+`decision portfolio` needs `--confirm` when it judges. `decision rank|history|verdict|replay` are reads. No orders.
 
 Notebook verbs that need `--confirm`: `delete`, `folder delete`, `file replace`, `file delete`, `file restore`, `source add-url`, `source upload`, `source add-web-search`, `chart render`, `artifact generate|start|steer|cancel`, `workflow create|update|run|archive|delete|schedule`, `decision create|update|run`, `settings set`, `agent steer|cancel`, `setup`.
 
 `notebook source reimport-x` without `--confirm` lists candidates. With `--confirm` it reimports. `--dry-run` forces the list.
 
-`notebook chat` is a notebook turn. `chat send` and `smaug ask` are Smaug. `chat send` works only for bot `smaug`. Other bots return `can_send: false`.
+`notebook chat` is a notebook turn. `chat send` and `smaug ask` are Smaug. `chat send` works only for bot `smaug`. Other bots return `can_send: false` with a `hint`.
+
+## Reading chats and messages
+
+Read a chat with `chat open BOT [--last N]` (default 20, oldest first). For `smaug` it is the conversation. For other bots it is the inbox. You get the stored raw markdown (`content` or `body`), not the rendered text. A `**Title**` is a heading the user saw in bold.
+
+```bash
+python -m app.cli chat open smaug --last 5
+python -m app.cli chat open news --last 5
+python -m app.cli chat get news --since today --kind earnings --ticker NVDA --limit 10
+python -m app.cli smaug threads get smaug-main --since today --last 10 --full
+python -m app.cli chat send smaug "What moved?"
+```
+
+- Every `ts` is UTC with `+00:00`. `today`, `yesterday`, and `YYYY-MM-DD` are days in the user's Settings time zone. Both `notifications list` and `smaug threads get` echo the resolved `since` and `until` with the offset.
+- A thread message has `channel` (`telegram` when it went through the bot, else the app scope) and `telegram_message_id`.
+- An inbox row has `channel` (`telegram` or `in_app`), `delivery` (`delivered`, `failed`, `suppressed`, `pending`, `not_sent`) and `delivered_at`. `delivered_at` is null unless Telegram accepted the message. `delivered_at_source: "row"` means there was no ledger row and the time is when the row was written after the send. `--full` adds `body` and `body_format` (`markdown` or `text`).
+- `chat send smaug` waits for the turn and prints `thread_id`, `user_message {id, ts}` and `reply {id, ts, channel, content}`. `--dry-run` sends nothing.
 
 `smaug model` is GET labels (`fast`, `medium`, `high`, `tool`). It does not PUT a model. To use one for a turn, pass `--model` on `smaug ask` or `chat send smaug`.
 
@@ -148,7 +169,21 @@ Notebook verbs that need `--confirm`: `delete`, `folder delete`, `file replace`,
 
 `notebook local` is a granted Native root, not a second cloud store. `setup` places the public Mac zip. It does not mint Agent keys. Do not bypass a Gatekeeper failure.
 
-`settings get` never prints secrets. `--full` keeps sent-history and Smaug memory blobs. Do not paste those into chat.
+Native commands need the Notebook Mac app. `--dry-run` previews and does not open the app or send the request. Writes below need `--confirm` after the user agrees.
+
+- `notebook device` covers `control`, `preferences`, `provider`, `role`, `folder`, `project`, `permissions`, `computer`, `browser`, `diagnostics`, `update`, and `model`. `preferences set`, `folder grant`, and `update install` need `--confirm`.
+- `account status` reads the signed-in account. `sign-in` and `sign-out` need `--confirm`. `account agent-key list` reads names and ids. `create` and `revoke` refuse and point at Notebook Settings. Do not print a key.
+- `connection list` and `check` are reads. `add`, `connect`, `disconnect`, `remove`, and `tool-policy set` need `--confirm`.
+- `support list` and `support get` read this account only. They do not refresh Linear.
+- `trading policy get` is a read. `trading policy propose` and `trading stop` need `--confirm`. Neither places an order.
+
+`sentiment today` is the news-bot pack. `book`, `watchlist`, `vs-portfolio`, and `delta` read the stored sector packet. `notifications list` without `--limit` pages every match, so pass `--since` or `--limit`. `notifications wait` polls until a quiet window and exits 0 with the last batch.
+
+`portfolio snapshot` is the latest stored book view. `compare` takes two to eight portfolios. `tree` shows parents. `sets` lists saved compare sets. Those four are reads.
+
+`smaug bot list` is a read. `smaug bot create` and `smaug bot run` need `--confirm`. `smaug bot workflow` is the same binder as `smaug workflow`.
+
+`settings get` never prints secrets. `--full` keeps sent-history and Smaug memory blobs. Do not paste those into chat. `settings models get` and `settings usage` read account data. Do not change the model from the CLI.
 
 ## Agent-friendly shape (gaps to close)
 
